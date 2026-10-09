@@ -1,0 +1,52 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login - Smart Library</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="form-container">
+        <h1>Admin Login</h1>
+
+        <form id="adminLoginForm">
+            <input type="email" id="email" placeholder="Admin Email" required>
+            <input type="password" id="password" placeholder="Password" required>
+            <button type="submit">Login</button>
+            <p id="message"></p>
+        </form>
+    </div>
+
+    <script>
+        document.getElementById("adminLoginForm").addEventListener("submit", async function(event) {
+            event.preventDefault();
+
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+            const message = document.getElementById("message");
+
+            try {
+                const response = await fetch("http://127.0.0.1:5000/api/admin/login", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    window.location.href = "admin.html";
+                } else {
+                    message.textContent = data.message || "Login failed";
+                }
+            } catch (error) {
+                message.textContent = "Backend start karo aur dobara try karo.";
+            }
+        });
+    </script>
+</body>
+</html>

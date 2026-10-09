@@ -1,0 +1,62 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Student Login - Smart Library</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="form-container">
+        <h1>Student Login</h1>
+
+        <form id="loginForm">
+            <input type="email" id="email" name="email"
+                   placeholder="Enter Email" required>
+
+            <input type="password" id="password" name="password"
+                   placeholder="Enter Password" required>
+
+            <button type="submit">Login</button>
+        </form>
+
+        <p id="message"></p>
+
+        <p>Don't have an account?</p>
+        <a href="signup.html">Create Account</a>
+    </div>
+
+    <script>
+        document.getElementById("loginForm").addEventListener("submit", async function(event) {
+            event.preventDefault();
+
+            const email = document.getElementById("email").value;
+            const password = document.getElementById("password").value;
+            const message = document.getElementById("message");
+
+            try {
+                const response = await fetch("http://127.0.0.1:5000/api/login", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ email, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    message.textContent = "Login successful!";
+                    localStorage.setItem("user", JSON.stringify(data.user));
+                    window.location.href = "student dashboard.html";
+                } else {
+                    message.textContent = data.error || "Login failed";
+                }
+            } catch (error) {
+                message.textContent = "Cannot connect to server. Check Flask.";
+            }
+        });
+    </script>
+
+</body>
+</html>

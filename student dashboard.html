@@ -1,0 +1,398 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard - Smart Library</title>
+    <link rel="stylesheet" href="style.css">
+
+    <style>
+        .dashboard {
+            max-width: 1100px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+
+        .book-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+        }
+
+        .book-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px #00000015;
+        }
+
+        .book-card h3 {
+            margin-top: 0;
+        }
+
+        .book-card button,
+        .action-button {
+            background: #2563eb;
+            color: white;
+            padding: 10px 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .book-card button:disabled {
+            background: #999;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin: 12px 0;
+            font-weight: bold;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background: #2563eb;
+            color: white;
+        }
+
+        @media (max-width: 600px) {
+            .search-box {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h2>Smart Library</h2>
+        <nav>
+            <a href="index.html">Home</a>
+        </nav>
+    </header>
+
+    <main class="dashboard">
+        <h1>Student Dashboard</h1>
+        <h2>Welcome to Smart Library</h2>
+        <p>Search books, borrow available books, and return borrowed books.</p>
+
+        <label for="studentEmail">Your registered student email:</label>
+        <input
+            type="email"
+            id="studentEmail"
+            placeholder="Enter your signup email"
+            required
+            style="width:100%;max-width:450px;padding:12px;box-sizing:border-box;"
+        >
+
+        <h2>Library Books</h2>
+
+        <div class="search-box">
+            <input
+                type="text"
+                id="searchInput"
+                placeholder="Search by title, author, or category..."
+            >
+            <button class="action-button" type="button" onclick="loadBooks()">Search</button>
+        </div>
+
+        <p id="bookMessage" class="status"></p>
+        <div id="bookGrid" class="book-grid"></div>
+
+        <h2>My Borrowed Books</h2>
+        <button class="action-button" type="button" onclick="loadMyBorrowings()">
+            Refresh My Records
+        </button>
+
+        <p id="borrowingMessage" class="status"></p>
+
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Book</th>
+                        <th>Borrow Date</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="myBorrowings"></tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        const API = "http://127.0.0.1:5000";
+
+        function escapeHTML(value) {
+            return String(value ?? "").replace(/[&<>"']/g, character => ({
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                '"': "&quot;",
+                "'": "&#39;"
+            })[character]);
+        }
+
+        function getStudentEmail() {
+            return document.getElementById("studentEmail")
+                .value.trim().toLowerCase();
+        }
+
+        async function getResponseData(response) {
+            const text = await response.text();
+
+            try {
+                return text ? JSON.parse(text) : {};
+            } catch {
+                throw new Error("Server returned an invalid response.");
+            }
+        }
+
+        async function loadBooks() {
+            const grid = document.getElementById("bookGrid");
+            const message = document.getElementById("bookMessage");
+            const search = document.getElementById("searchInput").value.trim();
+
+            grid.innerHTML = "";
+            message.textContent = "Loading books...";
+
+            try {
+                const response = await fetch(
+                    API + "/api/books?search=" + encodeURIComponent(search)
+                );
+
+                const books = await getResponseData(response);
+
+                if (!response.ok || !Array.isArray(books)) {
+                    throw new Error("Could not load books.");
+                }
+
+                message.textContent = books.length
+                    ? "Showing " + books.length + " book(s)."
+                    : "No books found.";
+
+                grid.innerHTML = books.map(book => {
+                    const available = book.available === true ||
+                        book.available === 1 ||
+                        book.available === "1";
+
+                    return `
+                        <div class="book-card">
+                            <h3>${escapeHTML(book.title)}</h3>
+                            <p><strong>Author:</strong> ${escapeHTML(book.author)}</p>
+                            <p><strong>Category:</strong> ${escapeHTML(book.category)}</p>
+                            <p><strong>Status:</strong> ${available ? "Available" : "Borrowed"}</p>
+                            <button
+                                type="button"
+                                onclick="borrowBook(${Number(book.id)})"
+                                ${available ? "" : "disabled"}
+                            >
+                                ${available ? "Borrow Book" : "Not Available"}
+                            </button>
+                        </div>
+                    `;
+                }).join("");
+
+            } catch (error) {
+                console.error("Load books error:", error);
+                message.textContent =
+                    "Unable to load books. Make sure Flask is running.";
+            }
+        }
+
+        async function borrowBook(bookId) {
+            const email = getStudentEmail();
+            const message = document.getElementById("bookMessage");
+
+            if (!email) {
+                message.textContent =
+                    "Please enter your registered student email first.";
+                document.getElementById("studentEmail").focus();
+                return;
+            }
+
+            message.textContent = "Processing borrow request...";
+
+            try {
+                const response = await fetch(API + "/api/borrow", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        user_email: email,
+                        book_id: Number(bookId)
+                    })
+                });
+
+                const data = await getResponseData(response);
+
+                message.textContent = data.message ||
+                    (response.ok ? "Book borrowed successfully." : "Borrow failed.");
+
+                if (!response.ok) {
+                    console.error("Borrow failed:", data);
+                    return;
+                }
+
+                if (data.due_date) {
+                    message.textContent += " Due date: " + data.due_date;
+                }
+
+                await loadBooks();
+                await loadMyBorrowings();
+
+            } catch (error) {
+                console.error("Borrow error:", error);
+                message.textContent =
+                    "Unable to borrow book. Check the backend and console.";
+            }
+        }
+
+        async function loadMyBorrowings() {
+            const email = getStudentEmail();
+            const table = document.getElementById("myBorrowings");
+            const message = document.getElementById("borrowingMessage");
+
+            if (!email) {
+                message.textContent =
+                    "Enter your registered student email to see your records.";
+                table.innerHTML = "";
+                return;
+            }
+
+            message.textContent = "Loading borrowing records...";
+            table.innerHTML = "";
+
+            try {
+                const response = await fetch(
+                    API + "/api/borrowings?email=" + encodeURIComponent(email)
+                );
+
+                const records = await getResponseData(response);
+
+                if (!response.ok || !Array.isArray(records)) {
+                    throw new Error("Could not load borrowing records.");
+                }
+
+                const myRecords = records.filter(record =>
+                    String(record.user_email || record.email || "")
+                        .trim().toLowerCase() === email
+                );
+
+                table.innerHTML = myRecords.length
+                    ? myRecords.map(record => {
+                        const title = record.book_title || record.title || "Unknown book";
+                        const status = String(record.status || "");
+
+                        return `
+                            <tr>
+                                <td>${escapeHTML(title)}</td>
+                                <td>${escapeHTML(record.borrow_date)}</td>
+                                <td>${escapeHTML(record.due_date)}</td>
+                                <td>${escapeHTML(status)}</td>
+                                <td>
+                                    ${status.toLowerCase() === "borrowed"
+                                        ? `<button class="action-button" type="button"
+                                            onclick="returnBook(${Number(record.id)})">
+                                            Return Book
+                                           </button>`
+                                        : "Completed"}
+                                </td>
+                            </tr>
+                        `;
+                    }).join("")
+                    : '<tr><td colspan="5">No borrowing records found.</td></tr>';
+
+                message.textContent = "";
+
+            } catch (error) {
+                console.error("Borrowing records error:", error);
+                message.textContent =
+                    "Unable to load records. Please check the backend.";
+            }
+        }
+
+        async function returnBook(borrowingId) {
+            const message = document.getElementById("borrowingMessage");
+
+            if (!confirm("Do you want to return this book?")) {
+                return;
+            }
+
+            try {
+                const response = await fetch(API + "/api/return", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        borrowing_id: Number(borrowingId)
+                    })
+                });
+
+                const data = await getResponseData(response);
+                message.textContent = data.message || "Request completed.";
+
+                if (response.ok) {
+                    await loadBooks();
+                    await loadMyBorrowings();
+                } else {
+                    console.error("Return failed:", data);
+                }
+
+            } catch (error) {
+                console.error("Return error:", error);
+                message.textContent =
+                    "Unable to return book. Please check the backend.";
+            }
+        }
+
+        document.getElementById("searchInput").addEventListener("keydown", event => {
+            if (event.key === "Enter") {
+                loadBooks();
+            }
+        });
+
+        document.getElementById("studentEmail").addEventListener("change", () => {
+            loadMyBorrowings();
+        });
+
+        loadBooks();
+    </script>
+</body>
+</html>
+```
